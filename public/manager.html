@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administrador - Leones Calistenia</title>
+    <link rel="stylesheet" href="css/styles.css">
+
+    <script type="module">
+  // Import the functions you need from the SDKs you need
+// Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getAuth } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+  import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  import { db } from "./firebase.js";
+  import { collection, query, where, getDocs, updateDoc, doc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCbugupJev7CVmVRAr8YrFKhIfvfC607UE",
+  authDomain: "leones-calistenia-bd720.firebaseapp.com",
+  projectId: "leones-calistenia-bd720",
+  storageBucket: "leones-calistenia-bd720.firebasestorage.app",
+  messagingSenderId: "514679371362",
+  appId: "1:514679371362:web:9bbb6305be4b5c472c433b",
+  measurementId: "G-8H7BK31Y21"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+  export const auth = getAuth(app);
+  export const db = getFirestore(app);
+
+  // Mostrar usuarios
+async function loadUsers() {
+  const q = query(collection(db, "users"), where("role", "!=", "manager"));
+  const snap = await getDocs(q);
+  snap.forEach((docu) => {
+    const user = docu.data();
+    console.log("User:", user.first_name, user.role);
+  });
+}
+
+// Actualizar rol
+async function updateUserRole(uid, newRole) {
+  await updateDoc(doc(db, "users", uid), { role: newRole });
+  alert("Rol actualizado!");
+}
+
+loadUsers();
+    </script>
+</head>
+<body>
+    <header>
+        <nav class="navbar">
+            <script src="js/navbar_toggle.js"></script>
+            <div class="logo"><a href="index.html" class="logo"><img src="/resources/logo.png" alt="Logo" class="logo_image">Leones Calistenia</a></div>
+            <ul class="nav-links">
+                <li><a href="index.html">Inicio</a></li>
+                <li><a href="manager.html" class="active">Panel de Administración</a></li>
+                <li><a href="profile.html">Mi Perfil</a></li>
+                <li><a href="#" id="logout">Cerrar Sesión</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <h1>Panel de Administración</h1>
+
+        <!-- Section for Managing Users -->
+        <section class="admin-section">
+            <h2>Usuarios</h2>
+            <table id="users-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Correo</th>
+                        <th>Rol</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Users will be loaded dynamically here -->
+                </tbody>
+            </table>
+        </section>
+
+
+        <!-- Section for Adding New Classes -->
+        <section class="admin-section">
+            <h2>Agregar Nueva Clase</h2>
+            <form id="add-class-form">
+                <label for="class-date">Fecha y Hora:</label>
+                <input type="datetime-local" id="class-date" required>
+
+                <label for="coach-id">ID del Coach:</label>
+                <input type="number" id="coach-id" required>
+
+                <label for="max-capacity">Capacidad Máxima:</label>
+                <input type="number" id="max-capacity" required>
+
+                <button type="submit">Agregar Clase</button>
+            </form>
+        </section>
+
+        <!-- Section for Tracking Memberships -->
+        <section class="admin-section">
+            <h2>Membresías</h2>
+            <table id="memberships-table">
+                <thead>
+                    <tr>
+                        <th>Miembro</th>
+                        <th>Paquete</th>
+                        <th>Clases Restantes</th>
+                        <th>Expira</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Memberships will be loaded dynamically here -->
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script src="js/manager.js" defer></script>
+    <footer>
+        <p>&copy; 2025 Leones Calistenia. Todos los derechos reservados.</p>
+    </footer>
+</body>
+</html>
