@@ -6,60 +6,6 @@
     <title>Autenticación - Leones Calistenia</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-
-    <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getAuth } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-  import { getFirestore } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCbugupJev7CVmVRAr8YrFKhIfvfC607UE",
-  authDomain: "leones-calistenia-bd720.firebaseapp.com",
-  projectId: "leones-calistenia-bd720",
-  storageBucket: "leones-calistenia-bd720.firebasestorage.app",
-  messagingSenderId: "514679371362",
-  appId: "1:514679371362:web:9bbb6305be4b5c472c433b",
-  measurementId: "G-8H7BK31Y21"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
-  export const auth = getAuth(app);
-  export const db = getFirestore(app);
-
-// Registro
-async function registerUser(email, password, firstName, lastName) {
-  const userCred = await createUserWithEmailAndPassword(auth, email, password);
-  await setDoc(doc(db, "users", userCred.user.uid), {
-    role: "member",
-    first_name: firstName,
-    last_name: lastName,
-    email: email,
-    created_at: new Date()
-  });
-  alert("Usuario registrado!");
-}
-
-// Login
-async function loginUser(email, password) {
-  try {
-    const userCred = await signInWithEmailAndPassword(auth, email, password);
-    alert("Login exitoso!");
-    window.location.href = "profile.html";
-  } catch (e) {
-    console.error("Error en login", e);
-    alert("Error en login: " + e.message);
-  }
-}
-    </script>
-
 </head>
 <body>
     <header>
@@ -68,6 +14,8 @@ async function loginUser(email, password) {
             <div class="logo"><a href="index.html" class="logo"><img src="/resources/logo.png" alt="Logo" class="logo_image">Leones Calistenia</a></div>
             <ul class="nav-links">
                 <li><a href="index.html">Inicio</a></li>
+                <li><a href="classes.html">Clases</a></li>
+                <li><a href="profile.html">Mi Perfil</a></li>
                 <li><a href="auth.html" class="active">Iniciar Sesión</a></li>
             </ul>
         </nav>
