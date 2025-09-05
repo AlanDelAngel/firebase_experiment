@@ -30,7 +30,10 @@
                 <button type="submit">Ingresar</button>
             </form>
             <br/>
-            <p>¿No tienes una cuenta? <a href="#" id="open-register">Regístrate aquí</a></p>
+            <div class="auth-links">
+                <p>¿No tienes una cuenta? <a href="#" id="open-register">Regístrate aquí</a></p>
+                <p>¿Olvidaste tu contraseña? <a href="#" id="open-forgot-password">Recuperar contraseña</a></p>
+            </div>
         </section>
 
         <!-- REGISTRATION MODAL (Hidden by Default) -->
@@ -48,6 +51,18 @@
                     <div class="g-recaptcha" data-sitekey="6LcHubkrAAAAAJCUIBUFrHJl68uEL239qvnW92VO"></div>
                     <br/>
                     <button type="submit">Registrarse</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- FORGOT PASSWORD MODAL (Hidden by Default) -->
+        <div id="forgot-password-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-forgot-password-btn">&times;</span>
+                <h2>Recuperar Contraseña</h2>
+                <form id="forgot-password-form">
+                    <input type="email" id="forgot-password-email" placeholder="Correo Electrónico" required>
+                    <button type="submit">Recuperar Contraseña</button>
                 </form>
             </div>
         </div>

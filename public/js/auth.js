@@ -4,7 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const logoutButton = document.getElementById('logout-button');
     const openRegisterBtn = document.getElementById('open-register');
     const registerModal = document.getElementById('register-modal');
+    const forgotPasswordModal = document.getElementById('forgot-password-modal');
+    const forgotPasswordBtn = document.getElementById('open-forgot-password');
     const closeBtn = document.querySelector('.close-btn');
+    const closeForgotPasswordBtn = document.querySelector('.close-forgot-password-btn');
 
     // Logout functionality
     if (logoutButton) {
@@ -49,23 +52,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Open Register Modal
-    openRegisterBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        registerModal.style.display = 'flex';
-    });
+    if (openRegisterBtn && registerModal) {
+        openRegisterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            registerModal.style.display = 'flex';
+        });
+    }
 
-    // Close Modal
-    closeBtn.addEventListener('click', () => {
-        registerModal.style.display = 'none';
-    });
+    // Open forgot password modal
+    if (forgotPasswordBtn && forgotPasswordModal) {
+        forgotPasswordBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            forgotPasswordModal.style.display = 'flex';
+        });
+    }
 
-    // Close modal when clicking outside the form
+    // Close forgot password modal
+    if (closeForgotPasswordBtn && forgotPasswordModal) {
+        closeForgotPasswordBtn.addEventListener('click', () => {
+            forgotPasswordModal.style.display = 'none';
+        });
+    }
+
+    // Close Register Modal
+    if (closeBtn && registerModal) {
+        closeBtn.addEventListener('click', () => {
+            registerModal.style.display = 'none';
+        });
+    }
+
+    // Close modals when clicking outside the form
     window.addEventListener('click', (e) => {
-        if (e.target === registerModal) {
+        if (registerModal && e.target === registerModal) {
             registerModal.style.display = 'none';
         }
+        if (forgotPasswordModal && e.target === forgotPasswordModal) {
+            forgotPasswordModal.style.display = 'none';
+        }
     });
-
 
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
