@@ -1,39 +1,48 @@
-//calling the modules
-const express = require ('express');
+// calling the modules
+const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const app = express();
 const errorHandler = require('./utils/errorHandler');
+
+
 app.use(express.json());
 app.use(cors());
 
-//call in the db API script
+// call in the db API script
 const db = require('./db');
 
-// Import authentication routes
+// ---- Rutas (importa todas antes de usarlas) ----
 const authRoutes = require('./routes/authRoutes');
-app.use('/auth', authRoutes);
-
-//allow public folder to be used
-app.use(express.static(path.join(__dirname + '/public')));
-
-// Global Error Handler
-app.use(errorHandler);
-
-app.listen(8080, () => {
-    console.log("Webpage running in http://localhost:8080/")
-});
-
-//usage of the CRUD elements
 const userRoutes = require('./routes/userRoutes');
 const classRoutes = require('./routes/classRoutes');
 const packageRoutes = require('./routes/packageRoutes');
-const enrollmentRoutes = require('./routes/enrollmentRoutes');
+const enrollmentRoutes = require('./routes/enrollmentRoutes'); // <- aquí
+const scheduleRoutes = require('./routes/scheduleRoutes');
 const managerRoutes = require('./routes/managerRoutes');
-const chatRoutes = require("./routes/chatRoutes");
-app.use("/chat", chatRoutes);
+const chatRoutes = require('./routes/chatRoutes');
+
+// Static (sirve /public primero)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ---- Monta rutas API (ANTES del error handler y del listen) ----
+app.use('/auth', authRoutes);
+app.use('/chat', chatRoutes);
 app.use('/manager', managerRoutes);
 app.use('/classes', classRoutes);
+app.use('/schedule', scheduleRoutes);
 app.use('/packages', packageRoutes);
-app.use('/enrollments', enrollmentRoutes);
+
+// IMPORTANTE: el frontend usa /enroll/... => monta aquí en singular
+app.use('/enroll', enrollmentRoutes); // <- CAMBIO respecto a /enrollments
+
 app.use('/users', userRoutes);
+
+// ---- Global Error Handler AL FINAL de las rutas ----
+app.use(errorHandler);
+
+// ---- Listen AL FINAL ----
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Webpage running in http://localhost:${PORT}/`);
+});

@@ -1,3 +1,4 @@
+// routes/scheduleRoutes.js
 const express = require('express');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
@@ -5,15 +6,12 @@ const { authenticate, authorize } = require('../middleware/auth');
 const router = express.Router();
 
 /**
- * GET /enroll/available
- * Lista clases disponibles (por defecto desde ahora hacia adelante).
- * Optional query: ?start=YYYY-MM-DD&end=YYYY-MM-DD (ISO o con tiempo)
+ * GET /schedule/events?start=YYYY-MM-DD&end=YYYY-MM-DD
+ * Retorna las clases en el rango solicitado (por defecto: desde hoy → +60 días).
  */
-router.get('/available', async (req, res) => {
+router.get('/events', async (req, res) => {
   try {
     const { start, end } = req.query;
-
-    // Rango por defecto: hoy -> +60 días
     const where = [];
     const params = [];
 
@@ -42,9 +40,7 @@ router.get('/available', async (req, res) => {
         c.coach_id,
         CONCAT(u.first_name, ' ', u.last_name) AS coach_name,
         (
-          SELECT COUNT(*)
-          FROM class_enrollments ce
-          WHERE ce.class_id = c.id
+          SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id
         ) AS enrolled
       FROM classes c
       LEFT JOIN branches b ON b.id = c.branch_id
@@ -55,11 +51,11 @@ router.get('/available', async (req, res) => {
       params
     );
 
-    // Mapea al formato que usaremos en el calendario
+    // Formato FullCalendar
     const events = rows.map(r => ({
       id: r.id,
       title: `${r.class_type} • ${r.branch_name}${r.coach_name ? ' • ' + r.coach_name : ''}`,
-      start: new Date(r.class_date).toISOString(),
+      start: new Date(r.class_date).toISOString(), // FullCalendar entiende ISO
       extendedProps: {
         class_type: r.class_type,
         branch_id: r.branch_id,
@@ -79,30 +75,30 @@ router.get('/available', async (req, res) => {
 });
 
 /**
- * POST /enroll/:class_id
- * Inscribir miembro a clase (requiere rol member).
+ * POST /schedule/enroll/:class_id
+ * Requiere: member autenticado.
  * Reglas:
- *  - Clase debe existir y ser futura
- *  - No duplicar inscripción a la misma clase
- *  - Respetar capacidad
- *  - Tener paquete vigente con horas disponibles
- *  - Máximo 2 clases por día
+ *  - Clase futura
+ *  - No duplicado
+ *  - Cupo disponible
+ *  - Paquete activo con clases disponibles
+ *  - Máx 2 clases por día (y sin solape en 2h)
  */
-router.post('/:class_id', authenticate, authorize(['member']), async (req, res) => {
+router.post('/enroll/:class_id', authenticate, authorize(['member']), async (req, res) => {
   const memberId = req.user.id;
   const classId = parseInt(req.params.class_id, 10);
-
   const conn = await db.getConnection();
+
   try {
     await conn.beginTransaction();
 
-    // 1) Clase existe y es futura
-    const [classInfoRows] = await conn.query('SELECT * FROM classes WHERE id = ?', [classId]);
-    if (!classInfoRows.length) {
+    // 1) Clase válida y futura
+    const [clsRows] = await conn.query('SELECT * FROM classes WHERE id = ?', [classId]);
+    if (!clsRows.length) {
       await conn.rollback();
       return res.status(404).json({ error: 'Class not found' });
     }
-    const cls = classInfoRows[0];
+    const cls = clsRows[0];
     if (new Date(cls.class_date) < new Date()) {
       await conn.rollback();
       return res.status(400).json({ error: 'Cannot enroll to a past class' });
@@ -128,8 +124,8 @@ router.post('/:class_id', authenticate, authorize(['member']), async (req, res) 
       return res.status(400).json({ error: 'Class is full' });
     }
 
-    // 4) Paquete activo con clases disponibles (elige el que vence antes)
-    const [activePackage] = await conn.query(
+    // 4) Paquete activo con clases disponibles (el que vence antes)
+    const [pkgRows] = await conn.query(
       `
       SELECT id, remaining_classes, expiration_date
       FROM class_packages
@@ -141,11 +137,11 @@ router.post('/:class_id', authenticate, authorize(['member']), async (req, res) 
       `,
       [memberId]
     );
-    if (!activePackage.length) {
+    if (!pkgRows.length) {
       await conn.rollback();
       return res.status(400).json({ error: 'No valid package available' });
     }
-    const pkg = activePackage[0];
+    const pkg = pkgRows[0];
 
     // 5) Máximo 2 clases por día
     const dayStart = new Date(cls.class_date);
@@ -153,7 +149,7 @@ router.post('/:class_id', authenticate, authorize(['member']), async (req, res) 
     const dayEnd = new Date(cls.class_date);
     dayEnd.setHours(23,59,59,999);
 
-    const [dayCountRows] = await conn.query(
+    const [dayCount] = await conn.query(
       `
       SELECT COUNT(*) AS cnt
       FROM class_enrollments ce
@@ -163,14 +159,13 @@ router.post('/:class_id', authenticate, authorize(['member']), async (req, res) 
       `,
       [memberId, dayStart, dayEnd]
     );
-    if (dayCountRows[0].cnt >= 2) {
+    if (dayCount[0].cnt >= 2) {
       await conn.rollback();
       return res.status(400).json({ error: 'Daily limit reached (max 2 classes per day)' });
     }
 
-    // (Opcional) No-superposición en una ventana de 2 horas
-    // Como la clase dura 2h, verificamos solape simple:
-    const [overlapRows] = await conn.query(
+    // 6) No solapar en 2h (clases de 2h)
+    const [overlap] = await conn.query(
       `
       SELECT 1
       FROM class_enrollments ce
@@ -181,18 +176,18 @@ router.post('/:class_id', authenticate, authorize(['member']), async (req, res) 
       `,
       [memberId, cls.class_date]
     );
-    if (overlapRows.length) {
+    if (overlap.length) {
       await conn.rollback();
       return res.status(400).json({ error: 'You already have a class overlapping within 2 hours' });
     }
 
-    // 6) Descontar del paquete
+    // 7) Descontar paquete
     await conn.query(
       'UPDATE class_packages SET remaining_classes = remaining_classes - 1 WHERE id = ?',
       [pkg.id]
     );
 
-    // 7) Crear inscripción
+    // 8) Crear inscripción
     await conn.query(
       'INSERT INTO class_enrollments (member_id, class_id) VALUES (?, ?)',
       [memberId, classId]

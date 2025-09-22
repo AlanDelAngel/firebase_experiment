@@ -1,103 +1,144 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const calendarGrid = document.getElementById("calendar-grid");
-    const calendarMonth = document.getElementById("calendar-month");
-    const prevMonthBtn = document.getElementById("prev-month");
-    const nextMonthBtn = document.getElementById("next-month");
+document.addEventListener('DOMContentLoaded', () => {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('role'); // debe ser 'member' para poder inscribirse
 
-    let currentMonth = new Date().getMonth();
-    let currentYear = new Date().getFullYear();
+  const calendarEl = document.getElementById('calendar');
+  const detailsEl = document.getElementById('class-details');
+  const enrollBtn = document.getElementById('enroll-btn');
+  const upcomingEl = document.getElementById('upcoming-list');
 
-    // Sample data for visualization (replace with API data)
-    const sampleClasses = [
-        { id: 1, date: "2025-03-05", title: "Calistenia Básica, Coach: Coach master, lugares disponible: 15" },
-        { id: 2, date: "2025-03-10", title: "Entrenamiento Avanzado, Coach: Coach master, lugares disponible: 15" },
-        { id: 3, date: "2025-03-15", title: "Flexibilidad y Movilidad, Coach: Coach master, lugares disponible: 15" },
-        { id: 4, date: "2025-03-20", title: "Rutina Full Body, Coach: Coach master, lugares disponible: 15" },
-        { id: 5, date: "2025-03-25", title: "Ejercicios de Resistencia, Coach: Coach master, lugares disponible: 15" },
+  let selectedEvent = null;
+
+  // Utilidad para pintar detalles
+  function renderDetails(evt) {
+    if (!evt) {
+      detailsEl.innerHTML = 'Selecciona una clase en el calendario para ver detalles y disponibilidad.';
+      enrollBtn.disabled = true;
+      return;
+    }
+    const p = evt.extendedProps;
+    const dt = new Date(evt.start);
+    const lines = [
+      `<div><strong>${evt.title}</strong></div>`,
+      `<div class="muted">📅 ${dt.toLocaleString()}</div>`,
+      `<div class="muted">🏢 ${p.branch_name}</div>`,
+      `<div class="muted">👤 ${p.coach_name || 'Por asignar'}</div>`,
+      `<div class="muted">🪑 ${p.available}/${p.max_capacity} lugares disponibles</div>`
     ];
+    detailsEl.innerHTML = lines.join('');
+    enrollBtn.disabled = !(token && role === 'member' && p.available > 0);
+  }
 
-    function loadCalendar() {
-        calendarGrid.innerHTML = "";
-    
-        const firstDayOfMonth = new Date(currentYear, currentMonth, 1);
-        const firstWeekday = firstDayOfMonth.getDay();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        calendarMonth.innerText = `${new Date(currentYear, currentMonth).toLocaleString("es-ES", { month: "long", year: "numeric" })}`;
-    
-        const adjustedFirstWeekday = firstWeekday === 0 ? 6 : firstWeekday - 1;
-    
-        // Add header row with days of the week outside of grid
-        if (!document.getElementById("calendar-header")) {
-            const headerContainer = document.createElement("div");
-            headerContainer.id = "calendar-header";
-            headerContainer.classList.add("calendar-header");
-    
-            const daysOfWeek = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-            daysOfWeek.forEach(day => {
-                const dayHeader = document.createElement("div");
-                dayHeader.classList.add("calendar-day-header");
-                dayHeader.innerText = day;
-                headerContainer.appendChild(dayHeader);
-            });
-    
-            calendarGrid.before(headerContainer); // Insert the header BEFORE the grid
-        }
-    
-        // Create grid container for days
-        const daysContainer = document.createElement("div");
-        daysContainer.classList.add("calendar-days");
-    
-        for (let i = 0; i < adjustedFirstWeekday; i++) {
-            const emptyCell = document.createElement("div");
-            emptyCell.classList.add("empty");
-            daysContainer.appendChild(emptyCell);
-        }
-    
-        for (let day = 1; day <= daysInMonth; day++) {
-            const dayCell = document.createElement("div");
-            dayCell.classList.add("calendar-day");
-            dayCell.innerText = day;
-    
-            const formattedDate = `${currentYear}-${(currentMonth + 1).toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
-            const classesOnThisDay = sampleClasses.filter(cls => cls.date === formattedDate);
-    
-            if (classesOnThisDay.length > 0) {
-                dayCell.classList.add("has-class");
-                dayCell.addEventListener("click", () => showClassesForDay(classesOnThisDay));
-            }
-    
-            daysContainer.appendChild(dayCell);
-        }
-    
-        calendarGrid.appendChild(daysContainer);
-    }
-    
-    
-    function showClassesForDay(classes) {
-        let message = "Clases disponibles:\n";
-        classes.forEach(cls => {
-            message += `- ${cls.title}\n`;
+  // Lista lateral de próximas clases (siguiente semana)
+  async function renderUpcoming() {
+    try {
+      const now = new Date();
+      const end = new Date(now); end.setDate(end.getDate() + 7);
+      const qs = new URLSearchParams({
+        start: now.toISOString().slice(0,10),
+        end: end.toISOString().slice(0,10)
+      }).toString();
+
+      const resp = await fetch(`/schedule/events?${qs}`);
+      if (!resp.ok) throw new Error('No se pudieron cargar próximas clases');
+      const items = await resp.json();
+
+      upcomingEl.innerHTML = items.slice(0, 8).map(ev => {
+        const p = ev.extendedProps;
+        const dt = new Date(ev.start);
+        return `
+          <div class="class-card">
+            <div><strong>${ev.title}</strong></div>
+            <div class="muted">${dt.toLocaleString()}</div>
+            <div class="muted">Disponibles: ${p.available}/${p.max_capacity}</div>
+            <div style="margin-top:6px;">
+              <button class="primary" data-id="${ev.id}" ${p.available === 0 || !(token && role==='member') ? 'disabled' : ''}>
+                Inscribirme
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Listeners para botones de la lista
+      upcomingEl.querySelectorAll('button.primary[data-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await enrollTo(btn.getAttribute('data-id'));
         });
-        alert(message);
+      });
+    } catch (e) {
+      upcomingEl.innerHTML = `<div class="muted">Sin datos</div>`;
+      console.error(e);
     }
+  }
 
-    prevMonthBtn.addEventListener("click", () => {
-        currentMonth--;
-        if (currentMonth < 0) {
-            currentMonth = 11;
-            currentYear--;
-        }
-        loadCalendar();
-    });
+  // Inscripción
+  async function enrollTo(classId) {
+    if (!token || role !== 'member') {
+      alert('Inicia sesión como miembro para inscribirte.');
+      return;
+    }
+    try {
+      const res = await fetch(`/schedule/enroll/${classId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({}));
+        throw new Error(err.error || 'No se pudo inscribir');
+      }
+      alert('¡Inscripción exitosa!');
+      calendar.refetchEvents();
+      renderUpcoming();
+      // si teníamos un evento seleccionado, refrescar sus props
+      if (selectedEvent) {
+        selectedEvent = null; // forzar detalles limpios; se re-selecciona al hacer click de nuevo
+        renderDetails(null);
+      }
+    } catch (e) {
+      alert(e.message);
+    }
+  }
 
-    nextMonthBtn.addEventListener("click", () => {
-        currentMonth++;
-        if (currentMonth > 11) {
-            currentMonth = 0;
-            currentYear++;
-        }
-        loadCalendar();
-    });
+  // FULLCALENDAR
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale: 'es',
+    height: 'auto',
+    firstDay: 1,
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+    events: async (info, success, failure) => {
+      try {
+        const qs = new URLSearchParams({
+          start: info.startStr,
+          end: info.endStr
+        }).toString();
+        const resp = await fetch(`/schedule/events?${qs}`);
+        if (!resp.ok) throw new Error('No se pudieron cargar las clases');
+        const events = await resp.json();
+        success(events);
+      } catch (e) {
+        console.error(e);
+        failure(e);
+      }
+    },
+    eventClick: (info) => {
+      selectedEvent = info.event;
+      renderDetails(selectedEvent);
+    },
+    eventDidMount: (arg) => {
+      const p = arg.event.extendedProps;
+      arg.el.title = `${arg.event.title}\nDisponibles: ${p.available}/${p.max_capacity}`;
+    }
+  });
 
-    loadCalendar();
+  calendar.render();
+  renderDetails(null);
+  renderUpcoming();
+
+  // Botón lateral "Inscribirme"
+  enrollBtn.addEventListener('click', async () => {
+    if (!selectedEvent) return;
+    await enrollTo(selectedEvent.id);
+  });
 });
