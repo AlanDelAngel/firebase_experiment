@@ -112,13 +112,4 @@ END IF;
 
 END;
 //
-DELIMITER ; --Remove for GCloud--
-
--- Indexes for performance optimization
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_class_packages_member_id ON class_packages(member_id);
-CREATE INDEX idx_classes_coach_id ON classes(coach_id);
-CREATE INDEX idx_classes_branch_id ON classes(branch_id);
-CREATE INDEX idx_enrollments_member_id ON class_enrollments(member_id);
-CREATE INDEX idx_transactions_member_id ON transactions(member_id);
-
+DELIMITER ; 
