@@ -16,19 +16,65 @@ router.get('/users', authenticate, authorize(['manager']), async (req, res) => {
   }
 });
 
-// Update user role
+// Update user role (con upsert a tablas hijas)
 router.put('/users/:id/role', authenticate, authorize(['manager']), async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
   const { role } = req.body;
-  if (role !== 'member' && role !== 'coach') {
-    return res.status(403).json({ error: 'No tienes permiso para asignar este rol.' });
+
+  if (!['member', 'coach'].includes(role)) {
+    return res.status(400).json({ error: 'Rol inválido. Solo member o coach.' });
   }
+
   try {
-    await db.query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
-    res.json({ success: true, message: 'Rol actualizado correctamente.' });
+    // 1) Actualiza rol en users
+    await db.query('UPDATE users SET role = ? WHERE id = ?', [role, userId]);
+
+    // 2) Asegura fila en tabla hija correspondiente (NO borramos la otra para evitar problemas de FKs históricos)
+    if (role === 'coach') {
+      await db.query(
+        'INSERT INTO coaches (id, specialization) VALUES (?, NULL) ON DUPLICATE KEY UPDATE specialization = specialization',
+        [userId]
+      );
+    } else {
+      await db.query(
+        `INSERT INTO members (id, membership_paid, membership_expiration)
+         VALUES (?, FALSE, NULL)
+         ON DUPLICATE KEY UPDATE membership_paid = membership_paid`,
+        [userId]
+      );
+    }
+
+    res.json({ success: true, message: 'Rol actualizado y sincronizado.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Listar sucursales para el <select>
+router.get('/branches', authenticate, authorize(['manager']), async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT id, branch_name FROM branches ORDER BY branch_name ASC');
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Listar coaches válidos (id + nombre) para el <select>
+router.get('/coaches', authenticate, authorize(['manager']), async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT u.id, CONCAT(u.first_name, ' ', u.last_name) AS name
+       FROM coaches c
+       JOIN users u ON u.id = c.id
+       ORDER BY name ASC`
+    );
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 // Delete a user
 router.delete('/users/:id', authenticate, authorize(['manager']), async (req, res) => {
@@ -50,13 +96,13 @@ router.get('/branches', authenticate, authorize(['manager']), async (req, res) =
   }
 });
 
-// Get all classes
+// Obtener clases
 router.get('/classes', authenticate, authorize(['manager']), async (req, res) => {
   try {
     const [classes] = await db.query(
-      `SELECT c.id, c.class_date, c.max_capacity, c.class_type, c.branch_id, c.coach_id
-       FROM classes c
-       ORDER BY c.class_date DESC`
+      `SELECT id, class_date, class_type, branch_id, coach_id, max_capacity
+       FROM classes
+       ORDER BY class_date DESC`
     );
     res.json(classes);
   } catch (error) {
@@ -64,27 +110,40 @@ router.get('/classes', authenticate, authorize(['manager']), async (req, res) =>
   }
 });
 
-// ---- FIXED: Add a class (now includes branch_id and class_type) ----
+// Crear clase (branch_id y class_type son requeridos; coach_id puede ser NULL)
 router.post('/classes', authenticate, authorize(['manager']), async (req, res) => {
-  const { coach_id, class_date, max_capacity, class_type, branch_id } = req.body;
+  let { coach_id, branch_id, class_type, class_date, max_capacity } = req.body;
 
   if (!branch_id || !class_type || !class_date || !max_capacity) {
     return res.status(400).json({ error: 'Faltan campos requeridos.' });
   }
 
+  // Normaliza coach_id a null si viene vacío/0
+  if (coach_id === '' || coach_id === undefined || coach_id === null || coach_id === 0 || coach_id === '0') {
+    coach_id = null;
+  }
+
   try {
+    if (coach_id !== null) {
+      const [chk] = await db.query('SELECT 1 FROM coaches WHERE id = ?', [coach_id]);
+      if (chk.length === 0) {
+        return res.status(400).json({ error: 'El coach especificado no existe.' });
+      }
+    }
+
     await db.query(
       `INSERT INTO classes (coach_id, branch_id, class_type, class_date, max_capacity)
        VALUES (?, ?, ?, ?, ?)`,
-      [coach_id || null, branch_id, class_type, class_date, max_capacity]
+      [coach_id, branch_id, class_type, class_date, max_capacity]
     );
+
     res.json({ success: true, message: 'Clase creada correctamente.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// ---- NEW: Delete class (used by delete button in UI) ----
+// Eliminar clase
 router.delete('/classes/:id', authenticate, authorize(['manager']), async (req, res) => {
   try {
     await db.query('DELETE FROM classes WHERE id = ?', [req.params.id]);
