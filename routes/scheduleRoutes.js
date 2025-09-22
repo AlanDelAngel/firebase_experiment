@@ -203,4 +203,57 @@ router.post('/enroll/:class_id', authenticate, authorize(['member']), async (req
   }
 });
 
+// GET /schedule/class/:class_id/enrollments
+// Solo manager/coach. Los coaches solo pueden ver SUS clases.
+router.get('/class/:class_id/enrollments', authenticate, authorize(['manager','coach']), async (req, res) => {
+  const classId = parseInt(req.params.class_id, 10);
+  const userId = req.user.id;
+  const role = req.user.role;
+
+  try {
+    // Verifica clase y propiedad para coaches
+    const [clsRows] = await db.query('SELECT id, coach_id FROM classes WHERE id = ?', [classId]);
+    if (!clsRows.length) return res.status(404).json({ error: 'Class not found' });
+
+    const cls = clsRows[0];
+    if (role === 'coach' && cls.coach_id !== userId) {
+      return res.status(403).json({ error: 'Not allowed to view enrollments for this class' });
+    }
+
+    // Lista de inscritos (nombre + id). Evitamos datos sensibles innecesarios.
+    const [rows] = await db.query(
+      `
+      SELECT u.id AS member_id,
+             u.first_name,
+             u.last_name,
+             u.email,
+             ce.enrolled_at
+      FROM class_enrollments ce
+      JOIN users u ON u.id = ce.member_id
+      WHERE ce.class_id = ?
+      ORDER BY ce.enrolled_at ASC
+      `,
+      [classId]
+    );
+
+    // (Opcional) enmascarar email
+    const masked = rows.map(r => {
+      const [local, domain] = (r.email || '').split('@');
+      const mlocal = local ? (local[0] + '***') : '';
+      return {
+        member_id: r.member_id,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        email: (local && domain) ? `${mlocal}@${domain}` : null,
+        enrolled_at: r.enrolled_at
+      };
+    });
+
+    res.json(masked);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 module.exports = router;

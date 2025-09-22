@@ -107,7 +107,13 @@ async function fetchClasses() {
         <td>${cls.branch_id}</td>
         <td>${cls.coach_id ?? "TBA"}</td>
         <td>${cls.max_capacity}</td>
-        <td><button class="delete-btn" onclick="deleteClass(${cls.id})">Eliminar</button></td>
+        <td>
+          <button class="delete-btn" 
+                  onclick="deleteClass(${cls.id})" 
+                  ${cls.enrolled > 0 ? 'disabled title="No se puede eliminar: hay inscritos"' : ''}>
+            Eliminar
+          </button>
+        </td>
       </tr>
     `).join("");
   } catch (error) {
@@ -244,5 +250,26 @@ window.deleteClass = async function(id) {
   } catch (e) {
     console.error(e);
     alert(e.message || "Error eliminando clase.");
+  }
+};
+
+window.deleteClass = async function(id) {
+  const token = localStorage.getItem("token");
+  if (!confirm("¿Eliminar esta clase?")) return;
+  try {
+    const res = await fetch(`/manager/classes/${id}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(err.error || "No se pudo eliminar la clase.");
+      return;
+    }
+    alert("Clase eliminada.");
+    location.reload();
+  } catch (e) {
+    console.error(e);
+    alert("Error eliminando clase.");
   }
 };

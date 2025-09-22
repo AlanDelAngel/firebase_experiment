@@ -19,7 +19,7 @@
     .panel h3 { margin: 0 0 8px; font-size: 16px; }
     .class-card { border:1px solid #222; border-radius:10px; padding:10px; margin-bottom:10px; }
     .muted { color:#aaa; font-size: 12px; }
-    button.primary { background:#3a86ff; border:none; color:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
+    button.primary { background:#038712; border:none; color:#fff; padding:8px 12px; border-radius:8px; cursor:pointer; }
     button.primary:disabled { opacity:.6; cursor:not-allowed; }
   </style>
 
@@ -45,12 +45,23 @@
       <aside class="panel">
         <h3>Detalles de la clase</h3>
         <div id="class-details" class="muted">Selecciona una clase en el calendario para ver detalles y disponibilidad.</div>
-        <div style="height:8px"></div>
-        <button id="enroll-btn" class="primary" disabled>Inscribirme</button>
+
+        <!-- Botón de inscripción (solo Members) -->
+        <div id="member-actions" style="margin-top:8px;">
+            <button id="enroll-btn" class="primary" disabled>Inscribirme</button>
+        </div>
+
+        <!-- Panel de inscritos (solo Manager/Coach) -->
+        <div id="staff-enrollments" style="display:none; margin-top:16px;">
+            <h3>Inscritos</h3>
+            <div id="enrolled-list" class="muted">Selecciona una clase para ver inscritos.</div>
+        </div>
+
         <div style="height:16px"></div>
         <h3>Próximas clases</h3>
         <div id="upcoming-list"></div>
-      </aside>
+        </aside>
+
     </div>
   </div>
 

@@ -96,13 +96,15 @@ router.get('/branches', authenticate, authorize(['manager']), async (req, res) =
   }
 });
 
-// Obtener clases
+// Get all classes (with enrolled count)
 router.get('/classes', authenticate, authorize(['manager']), async (req, res) => {
   try {
     const [classes] = await db.query(
-      `SELECT id, class_date, class_type, branch_id, coach_id, max_capacity
-       FROM classes
-       ORDER BY class_date DESC`
+      `SELECT 
+         c.id, c.class_date, c.class_type, c.branch_id, c.coach_id, c.max_capacity,
+         (SELECT COUNT(*) FROM class_enrollments ce WHERE ce.class_id = c.id) AS enrolled
+       FROM classes c
+       ORDER BY c.class_date DESC`
     );
     res.json(classes);
   } catch (error) {
@@ -143,10 +145,26 @@ router.post('/classes', authenticate, authorize(['manager']), async (req, res) =
   }
 });
 
-// Eliminar clase
+// Delete a class (only if no enrollments)
 router.delete('/classes/:id', authenticate, authorize(['manager']), async (req, res) => {
+  const classId = parseInt(req.params.id, 10);
   try {
-    await db.query('DELETE FROM classes WHERE id = ?', [req.params.id]);
+    const [[{ enrolled }]] = await db.query(
+      'SELECT COUNT(*) AS enrolled FROM class_enrollments WHERE class_id = ?',
+      [classId]
+    );
+
+    if (enrolled > 0) {
+      return res.status(409).json({ 
+        error: 'No puedes eliminar esta clase porque tiene usuarios inscritos.' 
+      });
+    }
+
+    const [result] = await db.query('DELETE FROM classes WHERE id = ?', [classId]);
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Clase no encontrada' });
+    }
+
     res.json({ success: true, message: 'Clase eliminada correctamente.' });
   } catch (error) {
     res.status(500).json({ error: error.message });
